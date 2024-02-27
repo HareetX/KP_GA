@@ -5,6 +5,8 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.text.SimpleDateFormat;
+import java.util.Arrays;
+import java.util.Comparator;
 import java.util.Date;
 import java.util.Random;
 
@@ -29,6 +31,12 @@ public class KP_GA {
                20, 25, 15, 10, 10, 10,  4,  4,  2, 1}};// 物品体积
     private int[] pb = {1000, 1000};// 背包容积
 
+    private double[] efficiency;
+
+    private int[] HD;
+
+    private int[] HV;
+
     private int LL; // 染色体长度
 
     private int dimension; // 维度
@@ -38,11 +46,13 @@ public class KP_GA {
     private int bestT;// 最佳出现代数
     private int bestLength; // 最佳编码价值
     private int[] bestTour; // 最佳编码
+    private int[] bestBackpack; // 最佳编码对应的背包重量
 
     // 初始种群，父代种群，行数表示种群规模，一行代表一个个体，即染色体，列表示染色体基因片段
     private int[][] oldPopulation;
     private int[][] newPopulation;// 新的种群，子代种群
     private int[] fitness;// 种群适应度，表示种群中各个个体的适应度
+    private int[][] backpack;// 种群背包重量
 
     private float[] Pi;// 种群中各个个体的累计概率
     private float Pc;// 交叉概率
@@ -75,18 +85,56 @@ public class KP_GA {
         test_case = test_case_name;
     }
 
+    private static int[] descendingSortedIndexes(double[] array) {
+        Integer[] indexes = new Integer[array.length];
+        for (int i = 0; i < indexes.length; i++) {
+            indexes[i] = i;
+        }
+
+        Arrays.sort(indexes, new Comparator<Integer>() {
+            @Override
+            public int compare(Integer index1, Integer index2) {
+                // 根据数组的值进行降序排序
+                return Double.compare(array[index2], array[index1]);
+            }
+        });
+
+        // 将Integer数组转换为int数组
+        int[] sortedIndexes = new int[indexes.length];
+        for (int i = 0; i < indexes.length; i++) {
+            sortedIndexes[i] = indexes[i];
+        }
+
+        return sortedIndexes;
+    }
+
     private void init() {
         bestLength = 0;
         bestTour = new int[LL];
         bestT = 0;
+        bestBackpack = new int[dimension];
         t = 0;
 
         newPopulation = new int[scale][LL];
         oldPopulation = new int[scale][LL];
+        backpack = new int[scale][dimension];
         fitness = new int[scale];
         Pi = new float[scale];
 
         random = new Random(System.currentTimeMillis());
+
+        efficiency = new double[LL];
+        for (int i = 0; i < LL; i++) {
+            int sum_b_i = 0;
+            for (int j = 0; j < dimension; j++) {
+                sum_b_i += b[j][i];
+            }
+            efficiency[i] = ((double) v[i]) / ((double) sum_b_i);
+        }
+
+        HD = descendingSortedIndexes(efficiency);
+
+        //HV = descendingSortedIndexes(v);
     }
 
     // 初始化种群
@@ -101,7 +149,69 @@ public class KP_GA {
         }
     }
 
-    public int evaluate(int[] chromosome) {
+    void op_repair(int[] chromosome) {
+        // 修复不可行解个体chromosome为可行解
+        int[] tmp_chromosome = new int[LL];
+        for (int i = 0; i < LL; i++) {
+            tmp_chromosome[i] = 0;
+        }
+
+        int[] bb = new int[dimension];
+        for (int i = 0; i < dimension; i++) {
+            bb[i] = 0;
+        }
+        boolean st = true;  // 未超出背包容量的标志
+        for (int i = 0; i < LL; i++) {
+            // 按HD顺序遍历物品
+            int index = HD[i];
+            if(chromosome[index] == 1) {
+                // chromosome已选中第index个物品
+                for (int j = 0; j < dimension; j++) {
+                    bb[j] += b[j][index];
+                    if (bb[j] > pb[j]) {
+                        st = false;
+                        break;
+                    }
+                }
+                if (!st) {
+                    break;
+                } else {
+                    tmp_chromosome[index] = 1;
+                }
+            }
+        }
+
+        // 更新chromosome
+        for (int i = 0; i < LL; i++) {
+            chromosome[i] = tmp_chromosome[i];
+        }
+    }
+
+    void op_optimize(int[] chromosome, int[] bb) {
+        // 优化可行解个体chromosome，使其充分利用背包资源
+        for (int i = 0; i < LL; i++) {
+            // 按HD顺序遍历物品
+            int index = HD[i];
+            if(chromosome[index] == 0) {
+                // chromosome未选中第index个物品
+                boolean st = true;  // 选择第index个物品后，仍未超出背包容量的标志
+                for (int j = 0; j < dimension; j++) {
+                    if (bb[j] + b[j][index] > pb[j]) {
+                        st = false;
+                        break;
+                    }
+                }
+                if (st) {
+                    for (int j = 0; j < dimension; j++) {
+                        bb[j] += b[j][index];
+                    }
+                    chromosome[index] = 1;
+                }
+            }
+        }
+    }
+
+    public int evaluate(int[] chromosome, int[] backpack) {
         // chromosome对应的总价值vv和总体积bb
         int vv = 0;
         int[] bb = new int[dimension];
@@ -127,8 +237,14 @@ public class KP_GA {
         }
         if (!st) {
             // 超出背包体积
+            for (int i = 0; i < dimension; i++) {
+                backpack[i] = 0;
+            }
             return 0;
         } else {
+            for (int i = 0; i < dimension; i++) {
+                backpack[i] = bb[i];
+            }
             return vv;
         }
     }
@@ -179,6 +295,9 @@ public class KP_GA {
             bestT = t;// 最好的染色体出现的代数;
             for (i = 0; i < LL; i++) {
                 bestTour[i] = oldPopulation[maxid][i];
+            }
+            for (i = 0; i < dimension; i++) {
+                bestBackpack[i] = backpack[maxid][i];
             }
         }
 
@@ -299,8 +418,19 @@ public class KP_GA {
         initGroup();
         // 计算初始化种群适应度，Fitness[max]
         for (k = 0; k < scale; k++) {
-            fitness[k] = evaluate(oldPopulation[k]);
+            fitness[k] = evaluate(oldPopulation[k], backpack[k]);
+            if (fitness[k] == 0) {
+                // 修复不可行解个体
+                op_repair(oldPopulation[k]);
+                fitness[k] = evaluate(oldPopulation[k], backpack[k]);
+            }
             // System.out.println(fitness[k]);
+        }
+
+        for (k = 0; k < scale; k++) {
+            // 优化背包资源利用不充分的可行解个体
+            op_optimize(oldPopulation[k], backpack[k]);
+            fitness[k] = evaluate(oldPopulation[k], backpack[k]);
         }
 
         // 计算初始化种群中各个个体的累积概率，Pi[max]
@@ -325,8 +455,20 @@ public class KP_GA {
             }
             // 计算种群适应度
             for (k = 0; k < scale; k++) {
-                fitness[k] = evaluate(oldPopulation[k]);
+                fitness[k] = evaluate(oldPopulation[k], backpack[k]);
+                if (fitness[k] == 0) {
+                    // 修复不可行解个体
+                    op_repair(oldPopulation[k]);
+                    fitness[k] = evaluate(oldPopulation[k], backpack[k]);
+                }
             }
+
+            for (k = 0; k < scale; k++) {
+                // 优化背包资源利用不充分的可行解个体
+                op_optimize(oldPopulation[k], backpack[k]);
+                fitness[k] = evaluate(oldPopulation[k], backpack[k]);
+            }
+
             // 计算种群中各个个体的累积概率
             countRate();
         }
@@ -373,23 +515,23 @@ public class KP_GA {
         System.out.println("最佳编码：");
         //向文件中写入内容
         writer.write("最佳编码价值：\n");
-        int sum = 0;
         for (i = 0; i < LL; i++) {
             System.out.print(bestTour[i] + ",");
             //向文件中写入内容
             writer.write(bestTour[i] + ",");
-            if (bestTour[i] == 1) {
-                sum += b[0][i];
-            }
         }
         System.out.println();
         //向文件中写入内容
         writer.write("\n");
 
         System.out.println("最佳编码重量：");
-        System.out.println(sum);
         //向文件中写入内容
-        writer.write("最佳编码重量：\n" + sum);
+        writer.write("最佳编码重量：\n");
+        for (i = 0; i < dimension; i++) {
+            System.out.println(bestBackpack[i] + " ");
+            //向文件中写入内容
+            writer.write(bestBackpack[i] + " ");
+        }
 
         writer.flush();
         writer.close();
@@ -404,7 +546,7 @@ public class KP_GA {
 
         TestCase tc = new TestCase();
         String test_case_dir = "testcases/IHGA/";
-        String test_case_name = "IHGA_1.dat";
+        String test_case_name = "IHGA_2.dat";
         tc.readTestCase(test_case_dir + test_case_name);
 
         //GA2 ga = new GA2(20, 50, 2, 500, 0.8f, 0.9f);
