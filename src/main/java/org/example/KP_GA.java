@@ -5,10 +5,7 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.text.SimpleDateFormat;
-import java.util.Arrays;
-import java.util.Comparator;
-import java.util.Date;
-import java.util.Random;
+import java.util.*;
 
 public class KP_GA {
 
@@ -85,6 +82,11 @@ public class KP_GA {
         test_case = test_case_name;
     }
 
+    /* 获取降序排序索引
+     * input:  data array
+     * output: index array
+     * Return the index array of the sorted array.
+     */
     private static int[] descendingSortedIndexes(double[] array) {
         Integer[] indexes = new Integer[array.length];
         for (int i = 0; i < indexes.length; i++) {
@@ -108,6 +110,10 @@ public class KP_GA {
         return sortedIndexes;
     }
 
+    /* 初始化KP_GA
+     * Initial the Algorithm parameters.
+     * Calculate the efficient and generate the HD & HV.
+     */
     private void init() {
         bestLength = 0;
         bestTour = new int[LL];
@@ -149,6 +155,12 @@ public class KP_GA {
         }
     }
 
+    /* 贪婪修复算子
+     * input:  不可行解个体chromosome
+     * output: None
+     * Repair chromosome by HD.
+     * The method will modify the input chromosome.
+     */
     void op_repair(int[] chromosome) {
         // 修复不可行解个体chromosome为可行解
         int[] tmp_chromosome = new int[LL];
@@ -187,6 +199,12 @@ public class KP_GA {
         }
     }
 
+    /* 贪婪优化算子
+     * input:  可行解个体chromosome
+     * output: None
+     * Optimize chromosome by HD in greedy.
+     * The method will modify the input chromosome.
+     */
     void op_optimize(int[] chromosome, int[] bb) {
         // 优化可行解个体chromosome，使其充分利用背包资源
         for (int i = 0; i < LL; i++) {
@@ -211,6 +229,13 @@ public class KP_GA {
         }
     }
 
+    /* 染色体评估
+     * input:  待评估chromosome, 待更新backpack
+     * output: total vale of the chromosome
+     * Evaluate the chromosome. Calculate the total value and backpack.
+     * If the backpack is less than capacity, update the backpack and return the total value.
+     * Set the backpack to 0 and return 0, if over.
+     */
     public int evaluate(int[] chromosome, int[] backpack) {
         // chromosome对应的总价值vv和总体积bb
         int vv = 0;
@@ -275,6 +300,14 @@ public class KP_GA {
         }
     }
 
+    // 复制染色体，k表示新染色体在种群中的位置，kk表示旧的染色体在种群中的位置
+    public void copyGh(int k, int kk) {
+        int i;
+        for (i = 0; i < LL; i++) {
+            newPopulation[k][i] = oldPopulation[kk][i];
+        }
+    }
+
     // 挑选某代种群中适应度最高的个体，直接复制到子代中
     // 前提是已经计算出各个个体的适应度Fitness[max]
     public void selectBestGh() {
@@ -305,14 +338,6 @@ public class KP_GA {
         copyGh(0, maxid);// 将当代种群中适应度最高的染色体k复制到新种群中，排在第一位0
     }
 
-    // 复制染色体，k表示新染色体在种群中的位置，kk表示旧的染色体在种群中的位置
-    public void copyGh(int k, int kk) {
-        int i;
-        for (i = 0; i < LL; i++) {
-            newPopulation[k][i] = oldPopulation[kk][i];
-        }
-    }
-
     // 赌轮选择策略挑选
     public void select() {
         int k, i, selectId;
@@ -331,13 +356,19 @@ public class KP_GA {
         }
     }
 
+    public void random_select(){
+
+    }
+
+    // 种群进化
     public void evolution() {
         int k;
+        float r;
+
         // 挑选某代种群中适应度最高的个体
         selectBestGh();
         // 赌轮选择策略挑选scale-1个下一代个体
         select();
-        float r;
 
         // 交叉方法
         for (k = 0; k < scale; k = k + 1) {
@@ -482,8 +513,12 @@ public class KP_GA {
             System.out.println("---" + fitness[k] + " " + Pi[k]);
         }
 
-        String dir = "logs/";
-        String[] file_list = new File(dir).list();
+        String dir = "logs/" + test_case.split("\\.")[0] + "/";
+        File log_dir = new File(dir);
+        if (!(log_dir.exists())) {
+            log_dir.mkdir();
+        }
+        String[] file_list = log_dir.list();
         int count = 0;
         for (String file : file_list) {
             if (file.contains(test_case)) {
@@ -528,7 +563,7 @@ public class KP_GA {
         //向文件中写入内容
         writer.write("最佳编码重量：\n");
         for (i = 0; i < dimension; i++) {
-            System.out.println(bestBackpack[i] + " ");
+            System.out.print(bestBackpack[i] + " ");
             //向文件中写入内容
             writer.write(bestBackpack[i] + " ");
         }
