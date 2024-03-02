@@ -110,6 +110,51 @@ public class KP_GA {
         return sortedIndexes;
     }
 
+    private static int[] descendingSortedIndexes(int[] array) {
+        Integer[] indexes = new Integer[array.length];
+        for (int i = 0; i < indexes.length; i++) {
+            indexes[i] = i;
+        }
+
+        Arrays.sort(indexes, new Comparator<Integer>() {
+            @Override
+            public int compare(Integer index1, Integer index2) {
+                // 根据数组的值进行降序排序
+                return Integer.compare(array[index2], array[index1]);
+            }
+        });
+
+        // 将Integer数组转换为int数组
+        int[] sortedIndexes = new int[indexes.length];
+        for (int i = 0; i < indexes.length; i++) {
+            sortedIndexes[i] = indexes[i];
+        }
+
+        return sortedIndexes;
+    }
+
+    public static void sortPopulationByFitness(int[][] population, int[] fitness) {
+        Integer[] indexes = new Integer[fitness.length];
+        for (int i = 0; i < indexes.length; i++) {
+            indexes[i] = i;
+        }
+
+        // 根据适应度数组对索引数组进行降序排序
+        Arrays.sort(indexes, Comparator.comparingInt(index -> -fitness[index]));
+
+        // 根据排序后的索引数组重新排列种群数组和适应度数组
+        int[][] newPopulation = new int[population.length][];
+        int[] newFitness = new int[fitness.length];
+        for (int i = 0; i < indexes.length; i++) {
+            newPopulation[i] = population[indexes[i]];
+            newFitness[i] = fitness[indexes[i]];
+        }
+
+        // 将排好序的种群数组和适应度数组写回输入的数组
+        System.arraycopy(newPopulation, 0, population, 0, population.length);
+        System.arraycopy(newFitness, 0, fitness, 0, fitness.length);
+    }
+
     /* 初始化KP_GA
      * Initial the Algorithm parameters.
      * Calculate the efficient and generate the HD & HV.
@@ -140,7 +185,7 @@ public class KP_GA {
 
         HD = descendingSortedIndexes(efficiency);
 
-        //HV = descendingSortedIndexes(v);
+        HV = descendingSortedIndexes(v);
     }
 
     // 初始化种群
@@ -308,9 +353,7 @@ public class KP_GA {
         }
     }
 
-    // 挑选某代种群中适应度最高的个体，直接复制到子代中
-    // 前提是已经计算出各个个体的适应度Fitness[max]
-    public void selectBestGh() {
+    public int findBestGh() {
         int k, i, maxid;
         int maxevaluation;
 
@@ -334,8 +377,16 @@ public class KP_GA {
             }
         }
 
+        return maxid;
+    }
+
+    // 挑选某代种群中适应度最高的个体，直接复制到子代中
+    // 前提是已经计算出各个个体的适应度Fitness[max]
+    public void selectBestGh() {
+        int max_id = findBestGh();
+
         // 复制染色体，k表示新染色体在种群中的位置，kk表示旧的染色体在种群中的位置
-        copyGh(0, maxid);// 将当代种群中适应度最高的染色体k复制到新种群中，排在第一位0
+        copyGh(0, max_id);// 将当代种群中适应度最高的染色体k复制到新种群中，排在第一位0
     }
 
     // 赌轮选择策略挑选
@@ -356,88 +407,163 @@ public class KP_GA {
         }
     }
 
-    public void random_select(){
-
-    }
-
-    // 种群进化
-    public void evolution() {
-        int k;
-        float r;
-
-        // 挑选某代种群中适应度最高的个体
-        selectBestGh();
-        // 赌轮选择策略挑选scale-1个下一代个体
-        select();
-
-        // 交叉方法
-        for (k = 0; k < scale; k = k + 1) {
-            r = random.nextFloat();// 产生概率
-            // System.out.println("交叉率..." + r);
-            if (r < Pc) {
-                int k_cross = random.nextInt(65535) % scale;
-                while (k_cross == k) {
-                    k_cross = random.nextInt(65535) % scale;
-                }
-                // System.out.println(k + "与" + k_cross + "进行交叉...");
-                OXCross(k, k_cross);// 进行交叉
+    public void best_pop_select(){
+        int[] new_fitness = new int[scale];
+        int[][] new_backpack = new int[scale][dimension];
+        // 计算种群适应度
+        for (int k = 0; k < scale; k++) {
+            new_fitness[k] = evaluate(newPopulation[k], new_backpack[k]);
+            if (new_fitness[k] == 0) {
+                // 修复不可行解个体
+                op_repair(newPopulation[k]);
+                new_fitness[k] = evaluate(newPopulation[k], new_backpack[k]);
             }
         }
-
-        // 变异方法
-        for (k = 0; k < scale; k = k + 1) {
-            r = random.nextFloat();// 产生概率
-            // System.out.println("变异率..." + r);
-            if (r < Pm) {
-                // System.out.println(k + "变异...");
-                OnCVariation(k);
-            }
+        for (int k = 0; k < scale; k++) {
+            // 优化背包资源利用不充分的可行解个体
+            op_optimize(newPopulation[k], new_backpack[k]);
+            new_fitness[k] = evaluate(newPopulation[k], new_backpack[k]);
         }
-    }
+        sortPopulationByFitness(newPopulation, new_fitness);
 
+        // 合并排序
+        int totalLength = scale + scale;
+        int[][] mergedPopulation = new int[totalLength][];
+        int[] mergedFitness = new int[totalLength];
+
+        int i = 0, j = 0, k = 0;
+        while (i < scale && j < scale) {
+            if (fitness[i] >= new_fitness[j]) {
+                mergedPopulation[k] = oldPopulation[i];
+                mergedFitness[k] = fitness[i];
+                i++;
+            } else {
+                mergedPopulation[k] = newPopulation[j];
+                mergedFitness[k] = new_fitness[j];
+                j++;
+            }
+            k++;
+        }
+
+        while (i < scale) {
+            mergedPopulation[k] = oldPopulation[i];
+            mergedFitness[k] = fitness[i];
+            i++;
+            k++;
+        }
+
+        while (j < scale) {
+            mergedPopulation[k] = newPopulation[j];
+            mergedFitness[k] = new_fitness[j];
+            j++;
+            k++;
+        }
+
+        // 选择最优的scale个染色体个体作为下一代种群
+        System.arraycopy(mergedPopulation, 0, oldPopulation, 0, scale);
+        System.arraycopy(mergedFitness, 0, fitness, 0, scale);
+    }
 
     // 两点交叉算子
-    void OXCross(int k1, int k2) {
-        int i, j, flag;
-        int ran1, ran2, temp = 0;
+    void OXCross() {
+        for (int k1 = 0; k1 < scale; k1 = k1 + 1) {
+            float r = random.nextFloat();// 产生概率
+            // System.out.println("交叉率..." + r);
+            if (r < Pc) {
+                int k2 = random.nextInt(65535) % scale;
+                while (k2 == k1) {
+                    k2 = random.nextInt(65535) % scale;
+                }
+                // System.out.println(k + "与" + k_cross + "进行交叉...");
 
-        ran1 = random.nextInt(65535) % LL;
-        ran2 = random.nextInt(65535) % LL;
+                int i, j, flag;
+                int ran1, ran2, temp = 0;
 
-        while (ran1 == ran2) {
-            ran2 = random.nextInt(65535) % LL;
-        }
-        if (ran1 > ran2)// 确保ran1<ran2
-        {
-            temp = ran1;
-            ran1 = ran2;
-            ran2 = temp;
-        }
-        flag = ran2 - ran1 + 1;// 个数
-        for (i = 0, j = ran1; i < flag; i++, j++) {
-            temp = newPopulation[k1][j];
-            newPopulation[k1][j] = newPopulation[k2][j];
-            newPopulation[k2][j] = temp;
-        }
+                ran1 = random.nextInt(65535) % LL;
+                ran2 = random.nextInt(65535) % LL;
 
+                while (ran1 == ran2) {
+                    ran2 = random.nextInt(65535) % LL;
+                }
+                if (ran1 > ran2)// 确保ran1<ran2
+                {
+                    temp = ran1;
+                    ran1 = ran2;
+                    ran2 = temp;
+                }
+                flag = ran2 - ran1 + 1;// 个数
+                for (i = 0, j = ran1; i < flag; i++, j++) {
+                    temp = newPopulation[k1][j];
+                    newPopulation[k1][j] = newPopulation[k2][j];
+                    newPopulation[k2][j] = temp;
+                }
+            }
+        }
+    }
+
+    // 按照均匀交叉
+    void OXCross_HGGA() {
+        for (int i = 0; i < scale; i += 2) {
+            // 随机选择两个父母个体
+            int parent1Index = random.nextInt(scale);
+            int parent2Index = random.nextInt(scale);
+
+            // 交叉操作
+            if (random.nextDouble() < Pc) {
+                for (int j = 0; j < LL; j++) {
+                    // 均匀交叉
+                    if (random.nextBoolean()) {
+                        newPopulation[i][j] = oldPopulation[parent1Index][j];
+                        newPopulation[i + 1][j] = oldPopulation[parent2Index][j];
+                    } else {
+                        newPopulation[i][j] = oldPopulation[parent2Index][j];
+                        newPopulation[i + 1][j] = oldPopulation[parent1Index][j];
+                    }
+                }
+            } else {
+                // 如果不进行交叉，则子代个体与父代个体相同
+                newPopulation[i] = oldPopulation[parent1Index].clone();
+                newPopulation[i + 1] = oldPopulation[parent2Index].clone();
+            }
+        }
     }
 
     // 多次对换变异算子
-    public void OnCVariation(int k) {
-        int ran1, ran2, temp;
-        int count;// 对换次数
-        count = random.nextInt(65535) % LL;
+    public void OnCVariation() {
+        for (int k = 0; k < scale; k = k + 1) {
+            float r = random.nextFloat();// 产生概率
+            // System.out.println("变异率..." + r);
+            if (r < Pm) {
+                // System.out.println(k + "变异...");
 
-        for (int i = 0; i < count; i++) {
+                int ran1, ran2, temp;
+                int count;// 对换次数
+                count = random.nextInt(65535) % LL;
 
-            ran1 = random.nextInt(65535) % LL;
-            ran2 = random.nextInt(65535) % LL;
-            while (ran1 == ran2) {
-                ran2 = random.nextInt(65535) % LL;
+                for (int i = 0; i < count; i++) {
+
+                    ran1 = random.nextInt(65535) % LL;
+                    ran2 = random.nextInt(65535) % LL;
+                    while (ran1 == ran2) {
+                        ran2 = random.nextInt(65535) % LL;
+                    }
+                    temp = newPopulation[k][ran1];
+                    newPopulation[k][ran1] = newPopulation[k][ran2];
+                    newPopulation[k][ran2] = temp;
+                }
             }
-            temp = newPopulation[k][ran1];
-            newPopulation[k][ran1] = newPopulation[k][ran2];
-            newPopulation[k][ran2] = temp;
+        }
+    }
+
+    // 各位异向变异算子，单独记录新的子代
+    public void OnCVariation_HGGA() {
+        for (int i = 0; i < scale; i += 1) {
+            for (int j = 0 ; j < LL; j += 1) {
+                if (random.nextDouble() < Pm) {
+                    // 如果随机数小于变异概率，则进行基位变异
+                    newPopulation[i][j] = (newPopulation[i][j] == 0) ? 1 : 0; // 0变异为1，1变异为0
+                }
+            }
         }
     }
 
@@ -457,15 +583,16 @@ public class KP_GA {
             }
             // System.out.println(fitness[k]);
         }
-
         for (k = 0; k < scale; k++) {
             // 优化背包资源利用不充分的可行解个体
             op_optimize(oldPopulation[k], backpack[k]);
             fitness[k] = evaluate(oldPopulation[k], backpack[k]);
         }
+        sortPopulationByFitness(oldPopulation, fitness);
 
         // 计算初始化种群中各个个体的累积概率，Pi[max]
         countRate();
+
         System.out.println("初始种群...");
         for (k = 0; k < scale; k++) {
             for (i = 0; i < LL; i++) {
@@ -476,32 +603,50 @@ public class KP_GA {
         }
 
         // 迭代进化
-        for (t = 0; t < MAX_GEN; t++) {
-            evolution();
-            // 将新种群newGroup复制到旧种群oldGroup中，准备下一代进化
-            for (k = 0; k < scale; k++) {
-                for (i = 0; i < LL; i++) {
-                    oldPopulation[k][i] = newPopulation[k][i];
-                }
-            }
-            // 计算种群适应度
-            for (k = 0; k < scale; k++) {
-                fitness[k] = evaluate(oldPopulation[k], backpack[k]);
-                if (fitness[k] == 0) {
-                    // 修复不可行解个体
-                    op_repair(oldPopulation[k]);
-                    fitness[k] = evaluate(oldPopulation[k], backpack[k]);
-                }
-            }
+        //for (t = 0; t < MAX_GEN; t++) {
+        while (t < MAX_GEN && Math.abs(fitness[0] - fitness[scale - 1]) >= 1) {
 
-            for (k = 0; k < scale; k++) {
-                // 优化背包资源利用不充分的可行解个体
-                op_optimize(oldPopulation[k], backpack[k]);
-                fitness[k] = evaluate(oldPopulation[k], backpack[k]);
-            }
+            // 挑选某代种群中适应度最高的个体
+            //selectBestGh();
+            findBestGh();
+            // 赌轮选择策略挑选scale-1个下一代个体
+            //select();
+
+            // 交叉方法
+            //OXCross();
+            OXCross_HGGA();
+
+            // 变异方法
+            //OnCVariation();
+            OnCVariation_HGGA();
+
+            // 将新种群newGroup复制到旧种群oldGroup中，准备下一代进化
+            //for (k = 0; k < scale; k++) {
+            //    for (i = 0; i < LL; i++) {
+            //        oldPopulation[k][i] = newPopulation[k][i];
+            //    }
+            //}
+            //// 计算种群适应度
+            //for (k = 0; k < scale; k++) {
+            //    fitness[k] = evaluate(oldPopulation[k], backpack[k]);
+            //    if (fitness[k] == 0) {
+            //        // 修复不可行解个体
+            //        op_repair(oldPopulation[k]);
+            //        fitness[k] = evaluate(oldPopulation[k], backpack[k]);
+            //    }
+            //}
+            //for (k = 0; k < scale; k++) {
+            //    // 优化背包资源利用不充分的可行解个体
+            //    op_optimize(oldPopulation[k], backpack[k]);
+            //    fitness[k] = evaluate(oldPopulation[k], backpack[k]);
+            //}
+            //sortPopulationByFitness(oldPopulation, fitness);
+            best_pop_select();
 
             // 计算种群中各个个体的累积概率
             countRate();
+
+            t++;
         }
 
         System.out.println("最后种群...");
@@ -513,7 +658,7 @@ public class KP_GA {
             System.out.println("---" + fitness[k] + " " + Pi[k]);
         }
 
-        String dir = "logs/" + test_case.split("\\.")[0] + "/";
+        String dir = "logs/" + test_case.split(".dat")[0] + "/";
         File log_dir = new File(dir);
         if (!(log_dir.exists())) {
             log_dir.mkdir();
@@ -580,12 +725,12 @@ public class KP_GA {
         System.out.println("Start....");
 
         TestCase tc = new TestCase();
-        String test_case_dir = "testcases/IHGA/";
-        String test_case_name = "IHGA_2.dat";
+        String test_case_dir = "testcases/chubeas/OR5x100/";
+        String test_case_name = "OR5x100-0.25_1.dat";
         tc.readTestCase(test_case_dir + test_case_name);
 
         //GA2 ga = new GA2(20, 50, 2, 500, 0.8f, 0.9f);
-        KP_GA ga = new KP_GA(20, tc, 500, 0.8f, 0.9f, test_case_name);
+        KP_GA ga = new KP_GA(20, tc, 5000, 0.5f, 0.1f, test_case_name);
         ga.init();
         ga.solve();
     }
