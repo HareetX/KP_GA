@@ -22,6 +22,7 @@ public class TestCase {
         String line;
         int line_num = 0;
         int item_count = 0;
+        int dimension_count = 0;
         int array_count = 0;
         int v_array = 0;
         while ((line=br.readLine()) != null) {
@@ -82,9 +83,10 @@ public class TestCase {
                 else {
                     for (int i = 0; i < len; i++) {
                         if (st_list[i] != null) {
-                            if (i < dimension) {
+                            if (dimension_count < dimension) {
                                 int n = Integer.valueOf(st_list[i]);
-                                pb[i] = n;
+                                pb[dimension_count] = n;
+                                dimension_count += 1;
                             }
                             else {
                                 return false;

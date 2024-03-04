@@ -407,6 +407,30 @@ public class KP_GA {
         }
     }
 
+    public void copy_pop_select(){
+        int k, i;
+        for (k = 0; k < scale; k++) {
+            for (i = 0; i < LL; i++) {
+                oldPopulation[k][i] = newPopulation[k][i];
+            }
+        }
+        // 计算种群适应度
+        for (k = 0; k < scale; k++) {
+            fitness[k] = evaluate(oldPopulation[k], backpack[k]);
+            if (fitness[k] == 0) {
+                // 修复不可行解个体
+                op_repair(oldPopulation[k]);
+                fitness[k] = evaluate(oldPopulation[k], backpack[k]);
+            }
+        }
+        for (k = 0; k < scale; k++) {
+            // 优化背包资源利用不充分的可行解个体
+            op_optimize(oldPopulation[k], backpack[k]);
+            fitness[k] = evaluate(oldPopulation[k], backpack[k]);
+        }
+        sortPopulationByFitness(oldPopulation, fitness);
+    }
+
     public void best_pop_select(){
         int[] new_fitness = new int[scale];
         int[][] new_backpack = new int[scale][dimension];
@@ -606,8 +630,9 @@ public class KP_GA {
         //for (t = 0; t < MAX_GEN; t++) {
         while (t < MAX_GEN && Math.abs(fitness[0] - fitness[scale - 1]) >= 1) {
 
-            // 挑选某代种群中适应度最高的个体
+            // 找到并选择某代种群中适应度最高的个体
             //selectBestGh();
+            // 找到某代种群中适应度最高的个体
             findBestGh();
             // 赌轮选择策略挑选scale-1个下一代个体
             //select();
@@ -621,26 +646,7 @@ public class KP_GA {
             OnCVariation_HGGA();
 
             // 将新种群newGroup复制到旧种群oldGroup中，准备下一代进化
-            //for (k = 0; k < scale; k++) {
-            //    for (i = 0; i < LL; i++) {
-            //        oldPopulation[k][i] = newPopulation[k][i];
-            //    }
-            //}
-            //// 计算种群适应度
-            //for (k = 0; k < scale; k++) {
-            //    fitness[k] = evaluate(oldPopulation[k], backpack[k]);
-            //    if (fitness[k] == 0) {
-            //        // 修复不可行解个体
-            //        op_repair(oldPopulation[k]);
-            //        fitness[k] = evaluate(oldPopulation[k], backpack[k]);
-            //    }
-            //}
-            //for (k = 0; k < scale; k++) {
-            //    // 优化背包资源利用不充分的可行解个体
-            //    op_optimize(oldPopulation[k], backpack[k]);
-            //    fitness[k] = evaluate(oldPopulation[k], backpack[k]);
-            //}
-            //sortPopulationByFitness(oldPopulation, fitness);
+            //copy_pop_select();
             best_pop_select();
 
             // 计算种群中各个个体的累积概率
@@ -725,8 +731,8 @@ public class KP_GA {
         System.out.println("Start....");
 
         TestCase tc = new TestCase();
-        String test_case_dir = "testcases/chubeas/OR5x100/";
-        String test_case_name = "OR5x100-0.25_1.dat";
+        String test_case_dir = "testcases/chubeas/OR10x100/";
+        String test_case_name = "OR10x100-0.25_1.dat";
         tc.readTestCase(test_case_dir + test_case_name);
 
         //GA2 ga = new GA2(20, 50, 2, 500, 0.8f, 0.9f);
