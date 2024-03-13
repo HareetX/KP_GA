@@ -69,7 +69,7 @@ public class KP_GA {
         Pm = m;
     }
 
-    public KP_GA(int s, TestCase tc, int g, float c, float m, String test_case_name) {
+    public KP_GA(int s, IntegerTestCase tc, int g, float c, float m, String test_case_name) {
         scale = s;
         LL = tc.LL;
         dimension = tc.dimension;
@@ -730,9 +730,9 @@ public class KP_GA {
     public static void main(String[] args) throws IOException {
         System.out.println("Start....");
 
-        TestCase tc = new TestCase();
-        String test_case_dir = "testcases/chubeas/OR10x100/";
-        String test_case_name = "OR10x100-0.25_1.dat";
+        IntegerTestCase tc = new IntegerTestCase();
+        String test_case_dir = "testcases/IHGA/";
+        String test_case_name = "HGGA_2.dat";
         tc.readTestCase(test_case_dir + test_case_name);
 
         //GA2 ga = new GA2(20, 50, 2, 500, 0.8f, 0.9f);
