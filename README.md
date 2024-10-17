@@ -54,7 +54,7 @@ The improved genetic algorithm includes the following key components:
 ## Performance Evaluation
 To further evaluate the effectiveness of the **Improved Genetic Algorithm (IGA)**, we conducted comparative tests against existing advanced genetic algorithm variants for MKP: **Guided Genetic Algorithm (GGA)**, **Improved Hybrid Genetic Algorithm (IHGA)**, and **Hybrid Greedy Genetic Algorithm (HGGA)**. The tests were performed on 18 benchmark instances from the **Chu & Beasley** dataset, covering small, medium, and large-scale problems.
 - The IGA consistently achieves the lowest **average relative error**  and **best relative error** across the benchmarks, confirming its robustness and stability in solving MKP.
-- Compared to GGA, IHGA, and HGGA, the IGA shows a significant improvement, reducing average relative error by up to **65.6%** and maintaining superior performance across different problem scales.
+- Compared to GGA, IHGA, and HGGA across different problem scales, the IGA shows a significant improvement, reducing average relative error by **19.8**, **27.2**, and **22.1** times, respectively.
 
 | Benchmark             | IGA           |                | GGA           |                | IHGA           |                 | HGGA           |                 |
 |-----------------------|---------------|----------------|---------------|----------------|----------------|-----------------|----------------|-----------------|
